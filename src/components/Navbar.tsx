@@ -17,9 +17,9 @@ const Navbar = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                Policy Consultation Platform
+                <i>-POLYVOICE-</i>
               </h1>
-              <p className="text-xs text-gray-500">SIH 2024 Solution</p>
+              <p className="text-xs text-gray-500">BY:siddharth patel</p>
             </div>
           </div>
           

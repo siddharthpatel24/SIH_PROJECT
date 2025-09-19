@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, MessageSquare, Send, Calendar, RefreshCw } from 'lucide-react';
+import { FileText, MessageSquare, Send, Calendar, RefreshCw, ChevronDown, ChevronUp, Users, TrendingUp } from 'lucide-react';
 import { getPolicies, addComment, getComments } from '../services/firebase';
 import { analyzeSentiment, generateSummary } from '../services/api';
 
@@ -25,6 +25,8 @@ const PoliciesFeed = () => {
   const [newComments, setNewComments] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
+  const [expandedPolicies, setExpandedPolicies] = useState<Record<string, boolean>>({});
+  const [showComments, setShowComments] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchPoliciesAndComments();
@@ -83,6 +85,20 @@ const PoliciesFeed = () => {
     } finally {
       setSubmitting(prev => ({ ...prev, [policyId]: false }));
     }
+  };
+
+  const togglePolicyExpansion = (policyId: string) => {
+    setExpandedPolicies(prev => ({
+      ...prev,
+      [policyId]: !prev[policyId]
+    }));
+  };
+
+  const toggleCommentsView = (policyId: string) => {
+    setShowComments(prev => ({
+      ...prev,
+      [policyId]: !prev[policyId]
+    }));
   };
 
   const getSentimentColor = (sentiment: string) => {
@@ -148,40 +164,138 @@ const PoliciesFeed = () => {
       ) : (
         <div className="space-y-8">
           {policies.map((policy) => (
-            <div key={policy.id} className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
+            <div key={policy.id} className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden hover:shadow-2xl transition-all duration-300">
               {/* Policy Header */}
-              <div className="p-8 border-b border-gray-200/50">
+              <div className="p-6 border-b border-gray-200/50">
                 <div className="flex items-start space-x-4">
                   <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-3 rounded-xl flex-shrink-0">
                     <FileText className="h-6 w-6 text-white" />
                   </div>
                   <div className="flex-1">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-3">{policy.title}</h2>
-                    <p className="text-gray-600 leading-relaxed mb-4">{policy.description}</p>
+                    <div className="flex items-start justify-between">
+                      <h2 className="text-2xl font-bold text-gray-800 mb-3 flex-1">{policy.title}</h2>
+                      <button
+                        onClick={() => togglePolicyExpansion(policy.id)}
+                        className="ml-4 p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                      >
+                        {expandedPolicies[policy.id] ? 
+                          <ChevronUp className="h-5 w-5 text-gray-600" /> : 
+                          <ChevronDown className="h-5 w-5 text-gray-600" />
+                        }
+                      </button>
+                    </div>
+                    
+                    {/* Policy Stats */}
+                    <div className="flex items-center space-x-6 mb-4">
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <Users className="h-4 w-4" />
+                        <span>{comments[policy.id]?.length || 0} responses</span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <Calendar className="h-4 w-4" />
+                        <span>{new Date(policy.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      {policy.sentimentDistribution && (
+                        <div className="flex items-center space-x-2 text-sm text-gray-600">
+                          <TrendingUp className="h-4 w-4" />
+                          <span>
+                            {policy.sentimentDistribution.positive > policy.sentimentDistribution.negative ? 
+                              'Mostly Positive' : 
+                              policy.sentimentDistribution.negative > policy.sentimentDistribution.positive ? 
+                              'Mostly Negative' : 'Mixed Response'
+                            }
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Collapsible Description */}
+                    <div className={`transition-all duration-300 overflow-hidden ${
+                      expandedPolicies[policy.id] ? 'max-h-none' : 'max-h-20'
+                    }`}>
+                      <p className="text-gray-600 leading-relaxed mb-4">{policy.description}</p>
+                    </div>
+                    
+                    {!expandedPolicies[policy.id] && policy.description.length > 200 && (
+                      <button
+                        onClick={() => togglePolicyExpansion(policy.id)}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        Read more...
+                      </button>
+                    )}
+                    
                     <div className="flex items-center space-x-2 text-sm text-gray-500">
-                      <Calendar className="h-4 w-4" />
-                      <span>Published on {new Date(policy.createdAt).toLocaleDateString()}</span>
+                      {policy.createdBy && (
+                        <>
+                          <span>Published by {policy.createdBy}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
+                
+                {/* AI Summary Section */}
+                {policy.aiSummary && (
+                  <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                    <h3 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
+                      <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-2 rounded-lg mr-3">
+                        <TrendingUp className="h-4 w-4 text-white" />
+                      </div>
+                      Public Opinion Analysis ({policy.totalComments || 0} responses)
+                    </h3>
+                    <p className="text-gray-700 leading-relaxed mb-3 text-sm">{policy.aiSummary}</p>
+                    
+                    {/* Sentiment Distribution */}
+                    {policy.sentimentDistribution && (
+                      <div className="flex items-center space-x-4 text-xs">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                          <span>Positive: {policy.sentimentDistribution.positive}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                          <span>Negative: {policy.sentimentDistribution.negative}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                          <span>Neutral: {policy.sentimentDistribution.neutral}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Comments Section */}
-              <div className="p-8">
-                <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center">
-                  <MessageSquare className="h-5 w-5 mr-2" />
-                  Public Feedback ({comments[policy.id]?.length || 0})
-                </h3>
+              <div className="p-6">
+                {/* Comments Header with Toggle */}
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                    <MessageSquare className="h-5 w-5 mr-2" />
+                    Public Feedback ({comments[policy.id]?.length || 0})
+                  </h3>
+                  <button
+                    onClick={() => toggleCommentsView(policy.id)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-sm font-medium"
+                  >
+                    <span>{showComments[policy.id] ? 'Hide Comments' : 'View Comments'}</span>
+                    {showComments[policy.id] ? 
+                      <ChevronUp className="h-4 w-4" /> : 
+                      <ChevronDown className="h-4 w-4" />
+                    }
+                  </button>
+                </div>
 
                 {/* Comment Input */}
-                <div className="mb-8">
+                <div className="mb-6">
                   <div className="flex space-x-4">
                     <textarea
                       value={newComments[policy.id] || ''}
                       onChange={(e) => setNewComments(prev => ({ ...prev, [policy.id]: e.target.value }))}
                       placeholder="Share your thoughts on this policy..."
-                      className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none bg-white/50"
-                      rows={3}
+                      className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none bg-white/70"
+                      rows={2}
                       disabled={submitting[policy.id]}
                     />
                     <button
@@ -200,55 +314,48 @@ const PoliciesFeed = () => {
                 </div>
 
                 {/* Comments List */}
-                <div className="space-y-6">
-                  {comments[policy.id]?.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>No feedback yet. Be the first to comment!</p>
-                    </div>
-                  ) : (
-                    comments[policy.id]?.map((comment) => (
-                      <div key={comment.id} className="bg-gradient-to-r from-gray-50 to-blue-50/30 rounded-xl p-6 border border-gray-200/50">
-                        <div className="flex flex-col lg:flex-row lg:space-x-6 space-y-4 lg:space-y-0">
-                          <div className="flex-1">
-                            <p className="text-gray-800 leading-relaxed mb-4">{comment.text}</p>
-                            
-                            {/* AI Summary */}
-                            <div className="bg-white/80 rounded-lg p-4 border border-blue-100">
-                              <h4 className="text-sm font-semibold text-gray-700 mb-2">AI Summary</h4>
-                              <p className="text-gray-600 text-sm leading-relaxed">{comment.summary}</p>
+                {showComments[policy.id] && (
+                  <div className="space-y-4 max-h-96 overflow-y-auto border-t border-gray-200 pt-4">
+                    {comments[policy.id]?.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No feedback yet. Be the first to comment!</p>
+                      </div>
+                    ) : (
+                      comments[policy.id]?.map((comment) => (
+                        <div key={comment.id} className="bg-gradient-to-r from-gray-50 to-blue-50/30 rounded-lg p-4 border border-gray-200/50">
+                          <div className="flex flex-col lg:flex-row lg:space-x-4 space-y-3 lg:space-y-0">
+                            <div className="flex-1">
+                              <p className="text-gray-800 leading-relaxed mb-3 text-sm">{comment.text}</p>
+                              
+                              <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                <Calendar className="h-3 w-3" />
+                                <span>{new Date(comment.timestamp).toLocaleString()}</span>
+                              </div>
                             </div>
-                            
-                            <div className="flex items-center space-x-2 text-xs text-gray-500 mt-3">
-                              <Calendar className="h-3 w-3" />
-                              <span>{new Date(comment.timestamp).toLocaleString()}</span>
-                            </div>
-                          </div>
 
-                          {/* Sentiment Analysis */}
-                          <div className="lg:w-48 text-center space-y-3">
-                            <div className="text-3xl">{getSentimentIcon(comment.sentiment)}</div>
-                            <span className={`inline-block px-3 py-1 rounded-lg border font-semibold text-sm ${getSentimentColor(comment.sentiment)}`}>
-                              {comment.sentiment}
-                            </span>
-                            <div>
-                              <div className="text-xs font-semibold text-gray-700 mb-1">Confidence</div>
-                              <div className="flex items-center space-x-2">
-                                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            {/* Sentiment Analysis */}
+                            <div className="lg:w-32 text-center space-y-2">
+                              <div className="text-2xl">{getSentimentIcon(comment.sentiment)}</div>
+                              <span className={`inline-block px-2 py-1 rounded border font-semibold text-xs ${getSentimentColor(comment.sentiment)}`}>
+                                {comment.sentiment}
+                              </span>
+                              <div>
+                                <div className="text-xs font-semibold text-gray-700 mb-1">{comment.confidence}%</div>
+                                <div className="bg-gray-200 rounded-full h-1">
                                   <div 
-                                    className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-500"
+                                    className="bg-gradient-to-r from-blue-500 to-indigo-500 h-1 rounded-full transition-all duration-500"
                                     style={{ width: `${comment.confidence}%` }}
                                   ></div>
                                 </div>
-                                <span className="text-xs font-semibold text-gray-700">{comment.confidence}%</span>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}

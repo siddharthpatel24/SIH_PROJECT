@@ -1,10 +1,12 @@
 import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { 
   getFirestore, 
   collection, 
   addDoc, 
   getDocs, 
   doc,
+  updateDoc,
   orderBy, 
   query,
   serverTimestamp,
@@ -24,6 +26,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+export const auth = getAuth(app);
 
 // Mock data for development when Firebase is not configured
 let mockPolicies: any[] = [
@@ -69,14 +72,54 @@ const isFirebaseConfigured = () => {
   return true; // Firebase is now properly configured
 };
 
+// Authentication functions
+export const loginAsGovernment = async (email: string, password: string) => {
+  try {
+    // Check if email is from government domain
+    if (!email.endsWith('@gov.in') && !email.endsWith('@government.in')) {
+      throw new Error('Only government officials with @gov.in or @government.in email addresses can access this feature.');
+    }
+    
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+};
+
+export const logoutGovernment = async () => {
+  try {
+    await signOut(auth);
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+};
+
+export const getCurrentUser = () => {
+  return auth.currentUser;
+};
+
+export const onAuthStateChange = (callback: (user: any) => void) => {
+  return onAuthStateChanged(auth, callback);
+};
+
 // Policy functions
 export const addPolicy = async (title: string, description: string) => {
   try {
+    const user = getCurrentUser();
+    if (!user || (!user.email?.endsWith('@gov.in') && !user.email?.endsWith('@government.in'))) {
+      throw new Error('Only government officials can add policies.');
+    }
+    
     if (isFirebaseConfigured()) {
       const docRef = await addDoc(collection(db, 'policies'), {
         title,
         description,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        createdBy: user.email,
+        totalComments: 0,
+        aiSummary: '',
+        sentimentDistribution: { positive: 0, negative: 0, neutral: 0 }
       });
       return { id: docRef.id, title, description, createdAt: new Date().toISOString() };
     } else {
@@ -128,6 +171,10 @@ export const addComment = async (policyId: string, comment: any) => {
         ...comment,
         timestamp: serverTimestamp()
       });
+      
+      // Update policy with new comment count and trigger AI analysis
+      await updatePolicyAnalysis(policyId);
+      
       return { id: docRef.id, ...comment };
     } else {
       // Use mock data
@@ -171,6 +218,31 @@ export const getComments = async (policyId: string) => {
   } catch (error) {
     console.error('Error getting comments:', error);
     throw error;
+  }
+};
+
+// Update policy with collective AI analysis
+const updatePolicyAnalysis = async (policyId: string) => {
+  try {
+    const comments = await getComments(policyId);
+    
+    if (comments.length === 0) return;
+    
+    // Generate collective summary from all comments
+    const allCommentsText = comments.map(c => c.text).join(' ');
+    const { generateCollectiveSummary, analyzeCollectiveSentiment } = await import('./api');
+    
+    const aiSummary = await generateCollectiveSummary(allCommentsText, comments.length);
+    const sentimentDistribution = analyzeCollectiveSentiment(comments);
+    
+    // Update policy document with AI analysis
+    await updateDoc(doc(db, 'policies', policyId), {
+      totalComments: comments.length,
+      aiSummary,
+      sentimentDistribution
+    });
+  } catch (error) {
+    console.error('Error updating policy analysis:', error);
   }
 };
 

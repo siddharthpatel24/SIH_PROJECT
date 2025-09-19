@@ -1,13 +1,55 @@
 import React, { useState } from 'react';
-import { Plus, CheckCircle, AlertCircle, FileText } from 'lucide-react';
-import { addPolicy } from '../services/firebase';
+import { Plus, CheckCircle, AlertCircle, FileText, Lock, LogOut } from 'lucide-react';
+import { addPolicy, loginAsGovernment, logoutGovernment, getCurrentUser, onAuthStateChange } from '../services/firebase';
 
 const AddPolicy = () => {
+  const [user, setUser] = useState<any>(null);
+  const [showLogin, setShowLogin] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
+  React.useEffect(() => {
+    const unsubscribe = onAuthStateChange((currentUser) => {
+      setUser(currentUser);
+      if (currentUser && (currentUser.email?.endsWith('@gov.in') || currentUser.email?.endsWith('@government.in'))) {
+        setShowLogin(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+    setLoginError('');
+
+    try {
+      await loginAsGovernment(email, password);
+      setEmail('');
+      setPassword('');
+    } catch (error: any) {
+      setLoginError(error.message);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutGovernment();
+      setUser(null);
+      setShowLogin(false);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) return;
@@ -28,8 +70,111 @@ const AddPolicy = () => {
     }
   };
 
+  // Show login form if user is not authenticated
+  if (!user || (!user.email?.endsWith('@gov.in') && !user.email?.endsWith('@government.in'))) {
+    return (
+      <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-gray-200/50">
+          <div className="text-center mb-8">
+            <div className="bg-gradient-to-r from-red-600 to-red-700 p-4 rounded-2xl shadow-lg mx-auto w-fit mb-4">
+              <Lock className="h-12 w-12 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">
+              Government Access Only
+            </h1>
+            <p className="text-gray-600">
+              Only authorized government officials can add policies
+            </p>
+          </div>
+
+          {!showLogin ? (
+            <div className="text-center">
+              <p className="text-gray-600 mb-6">
+                You need to be logged in with a government email address (@gov.in or @government.in) to access this feature.
+              </p>
+              <button
+                onClick={() => setShowLogin(true)}
+                className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200"
+              >
+                Login as Government Official
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Government Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your.name@gov.in"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
+                  required
+                />
+              </div>
+              
+              {loginError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                  {loginError}
+                </div>
+              )}
+              
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowLogin(false)}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  {isLoggingIn ? 'Logging in...' : 'Login'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Header with Logout */}
+      <div className="flex justify-between items-center mb-8">
+        <div></div>
+        <div className="flex items-center space-x-4">
+          <span className="text-sm text-gray-600">
+            Logged in as: <span className="font-semibold">{user.email}</span>
+          </span>
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-2 px-4 py-2 bg-red-100 text-red-700 font-semibold rounded-lg hover:bg-red-200 transition-all duration-200"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
+
       <div className="text-center mb-12">
         <div className="flex justify-center mb-6">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 rounded-2xl shadow-lg">

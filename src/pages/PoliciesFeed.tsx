@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { Link } from 'react-router-dom';
+import { auth } from '../services/firebase';
 import { FileText, MessageSquare, Send, Calendar, RefreshCw, ChevronDown, ChevronUp, Users, TrendingUp } from 'lucide-react';
 import { getPolicies, addComment, getComments } from '../services/firebase';
 import { analyzeSentiment, generateSummary } from '../services/api';
@@ -20,6 +24,8 @@ interface Comment {
 }
 
 const PoliciesFeed = () => {
+  const { t } = useTranslation();
+  const [user] = useAuthState(auth);
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [newComments, setNewComments] = useState<Record<string, string>>({});
@@ -53,6 +59,11 @@ const PoliciesFeed = () => {
   };
 
   const handleCommentSubmit = async (policyId: string) => {
+    if (!user) {
+      alert(t('loginToComment'));
+      return;
+    }
+
     const commentText = newComments[policyId]?.trim();
     if (!commentText) return;
 
@@ -69,6 +80,8 @@ const PoliciesFeed = () => {
         sentiment,
         summary,
         confidence,
+        userId: user.uid,
+        userName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
         timestamp: new Date().toISOString()
       });
 
@@ -138,9 +151,7 @@ const PoliciesFeed = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12">
         <div>
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            Policy <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Consultation</span>
-          </h1>
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">{t('policies')}</h1>
           <p className="text-lg text-gray-600">
             Browse government policies and share your feedback
           </p>
@@ -150,7 +161,7 @@ const PoliciesFeed = () => {
           className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200"
         >
           <RefreshCw className="h-5 w-5" />
-          <span>Refresh</span>
+          <span>{t('refreshData')}</span>
         </button>
       </div>
 
@@ -273,13 +284,13 @@ const PoliciesFeed = () => {
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold text-gray-800 flex items-center">
                     <MessageSquare className="h-5 w-5 mr-2" />
-                    Public Feedback ({comments[policy.id]?.length || 0})
+                    {t('publicFeedback')} ({comments[policy.id]?.length || 0})
                   </h3>
                   <button
                     onClick={() => toggleCommentsView(policy.id)}
                     className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-sm font-medium"
                   >
-                    <span>{showComments[policy.id] ? 'Hide Comments' : 'View Comments'}</span>
+                    <span>{showComments[policy.id] ? t('hideComments') : t('viewComments')}</span>
                     {showComments[policy.id] ? 
                       <ChevronUp className="h-4 w-4" /> : 
                       <ChevronDown className="h-4 w-4" />
@@ -288,30 +299,42 @@ const PoliciesFeed = () => {
                 </div>
 
                 {/* Comment Input */}
-                <div className="mb-6">
-                  <div className="flex space-x-4">
-                    <textarea
-                      value={newComments[policy.id] || ''}
-                      onChange={(e) => setNewComments(prev => ({ ...prev, [policy.id]: e.target.value }))}
-                      placeholder="Share your thoughts on this policy..."
-                      className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none bg-white/70"
-                      rows={2}
-                      disabled={submitting[policy.id]}
-                    />
-                    <button
-                      onClick={() => handleCommentSubmit(policy.id)}
-                      disabled={!newComments[policy.id]?.trim() || submitting[policy.id]}
-                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center space-x-2"
-                    >
-                      {submitting[policy.id] ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      ) : (
-                        <Send className="h-5 w-5" />
-                      )}
-                      <span className="hidden sm:inline">Submit</span>
-                    </button>
+                {user ? (
+                  <div className="mb-6">
+                    <div className="flex space-x-4">
+                      <textarea
+                        value={newComments[policy.id] || ''}
+                        onChange={(e) => setNewComments(prev => ({ ...prev, [policy.id]: e.target.value }))}
+                        placeholder={t('shareThoughts')}
+                        className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none bg-white/70"
+                        rows={2}
+                        disabled={submitting[policy.id]}
+                      />
+                      <button
+                        onClick={() => handleCommentSubmit(policy.id)}
+                        disabled={!newComments[policy.id]?.trim() || submitting[policy.id]}
+                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center space-x-2"
+                      >
+                        {submitting[policy.id] ? (
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        ) : (
+                          <Send className="h-5 w-5" />
+                        )}
+                        <span className="hidden sm:inline">{t('submit')}</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                    <p className="text-blue-700 mb-3">{t('loginToComment')}</p>
+                    <Link
+                      to="/login"
+                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                    >
+                      {t('login')}
+                    </Link>
+                  </div>
+                )}
 
                 {/* Comments List */}
                 {showComments[policy.id] && (
@@ -319,13 +342,21 @@ const PoliciesFeed = () => {
                     {comments[policy.id]?.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p>No feedback yet. Be the first to comment!</p>
+                        <p>{t('noFeedbackYet')}</p>
                       </div>
                     ) : (
                       comments[policy.id]?.map((comment) => (
                         <div key={comment.id} className="bg-gradient-to-r from-gray-50 to-blue-50/30 rounded-lg p-4 border border-gray-200/50">
                           <div className="flex flex-col lg:flex-row lg:space-x-4 space-y-3 lg:space-y-0">
                             <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-2">
+                                <div className="w-6 h-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-xs font-semibold">
+                                    {(comment.userName || 'U').charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <span className="text-sm font-medium text-gray-700">{comment.userName || 'Anonymous'}</span>
+                              </div>
                               <p className="text-gray-800 leading-relaxed mb-3 text-sm">{comment.text}</p>
                               
                               <div className="flex items-center space-x-2 text-xs text-gray-500">
@@ -338,10 +369,10 @@ const PoliciesFeed = () => {
                             <div className="lg:w-32 text-center space-y-2">
                               <div className="text-2xl">{getSentimentIcon(comment.sentiment)}</div>
                               <span className={`inline-block px-2 py-1 rounded border font-semibold text-xs ${getSentimentColor(comment.sentiment)}`}>
-                                {comment.sentiment}
+                                {t(comment.sentiment.toLowerCase())}
                               </span>
                               <div>
-                                <div className="text-xs font-semibold text-gray-700 mb-1">{comment.confidence}%</div>
+                                <div className="text-xs font-semibold text-gray-700 mb-1">{t('confidence')}: {comment.confidence}%</div>
                                 <div className="bg-gray-200 rounded-full h-1">
                                   <div 
                                     className="bg-gradient-to-r from-blue-500 to-indigo-500 h-1 rounded-full transition-all duration-500"

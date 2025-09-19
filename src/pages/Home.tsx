@@ -1,8 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { MessageSquare, TrendingUp, Users, ArrowRight, Brain, BarChart3, FileText } from 'lucide-react';
 
 const Home = () => {
+  const { t } = useTranslation();
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero Section */}
@@ -14,28 +17,27 @@ const Home = () => {
         </div>
         <h1 className="text-4xl md:text-6xl font-bold text-gray-800 mb-6">
           <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            eConsultation
+            {t('heroTitle')}
           </span>
           <br />
-          <span className="text-gray-700">Sentiment Analysis</span>
+          <span className="text-gray-700">{t('heroSubtitle')}</span>
         </h1>
         <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-          Transform public feedback into actionable insights with AI-powered sentiment analysis. 
-          Our solution helps government departments understand citizen opinions from e-consultation platforms.
+          {t('heroDescription')}
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             to="/policies"
             className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200"
           >
-            View Policies
+            {t('viewPolicies')}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Link>
           <Link
             to="/dashboard"
             className="inline-flex items-center px-8 py-4 bg-white text-gray-700 font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200 border border-gray-200"
           >
-            View Analytics
+            {t('viewAnalytics')}
             <BarChart3 className="ml-2 h-5 w-5" />
           </Link>
         </div>
@@ -44,17 +46,12 @@ const Home = () => {
       {/* Problem Statement */}
       <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-8 mb-16 shadow-xl border border-gray-200/50">
         <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">
-          The Challenge
+          {t('theChallenge')}
         </h2>
         <div className="grid md:grid-cols-2 gap-8 items-center">
           <div>
             <p className="text-gray-700 text-lg leading-relaxed mb-4">
-              Government policies and laws need public consultation before implementation. 
-              Citizens need a platform to provide feedback on proposed policies, and officials need tools to analyze this feedback efficiently.
-            </p>
-            <p className="text-gray-700 text-lg leading-relaxed">
-              Our platform enables government officials to post policies for public consultation, 
-              allows citizens to provide feedback, and uses AI to analyze sentiment and generate insights for better policy-making.
+              {t('challengeDescription')}
             </p>
           </div>
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6">
@@ -88,7 +85,7 @@ const Home = () => {
           <div className="bg-gradient-to-r from-green-400 to-green-600 p-3 rounded-xl w-fit mb-6">
             <FileText className="h-8 w-8 text-white" />
           </div>
-          <h3 className="text-2xl font-bold text-gray-800 mb-4">Policy Management</h3>
+          <h3 className="text-2xl font-bold text-gray-800 mb-4">{t('policyTitle')}</h3>
           <p className="text-gray-600 leading-relaxed">
             Government officials can easily post new policies and laws for public consultation and feedback
           </p>
@@ -98,7 +95,7 @@ const Home = () => {
           <div className="bg-gradient-to-r from-purple-400 to-purple-600 p-3 rounded-xl w-fit mb-6">
             <Users className="h-8 w-8 text-white" />
           </div>
-          <h3 className="text-2xl font-bold text-gray-800 mb-4">Citizen Engagement</h3>
+          <h3 className="text-2xl font-bold text-gray-800 mb-4">{t('publicFeedback')}</h3>
           <p className="text-gray-600 leading-relaxed">
             Citizens can easily browse policies and provide meaningful feedback on government initiatives
           </p>
@@ -108,7 +105,7 @@ const Home = () => {
           <div className="bg-gradient-to-r from-blue-400 to-blue-600 p-3 rounded-xl w-fit mb-6">
             <TrendingUp className="h-8 w-8 text-white" />
           </div>
-          <h3 className="text-2xl font-bold text-gray-800 mb-4">AI-Powered Analytics</h3>
+          <h3 className="text-2xl font-bold text-gray-800 mb-4">{t('analyticsTitle')}</h3>
           <p className="text-gray-600 leading-relaxed">
             Advanced sentiment analysis and visual analytics help officials understand public opinion
           </p>
@@ -125,7 +122,7 @@ const Home = () => {
           to="/policies"
           className="inline-flex items-center px-8 py-4 bg-white text-blue-600 font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200"
         >
-          Explore Policies
+          {t('viewPolicies')}
           <ArrowRight className="ml-2 h-5 w-5" />
         </Link>
       </div>

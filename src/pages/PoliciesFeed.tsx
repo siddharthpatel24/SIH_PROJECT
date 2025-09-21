@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { Link } from 'react-router-dom';
 import { auth } from '../services/firebase';
-import { FileText, MessageSquare, Send, Calendar, RefreshCw, ChevronDown, ChevronUp, Users, TrendingUp } from 'lucide-react';
-import { getPolicies, addComment, getComments } from '../services/firebase';
+import { FileText, MessageSquare, Send, Calendar, RefreshCw, ChevronDown, ChevronUp, Users, TrendingUp, Trash2, AlertTriangle } from 'lucide-react';
+import { getPolicies, addComment, getComments, deleteComment } from '../services/firebase';
 import { analyzeSentiment, generateSummary } from '../services/api';
 
 interface Policy {
@@ -33,6 +33,8 @@ const PoliciesFeed = () => {
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
   const [expandedPolicies, setExpandedPolicies] = useState<Record<string, boolean>>({});
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
+  const [deletingComment, setDeletingComment] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPoliciesAndComments();
@@ -97,6 +99,28 @@ const PoliciesFeed = () => {
       console.error('Error submitting comment:', error);
     } finally {
       setSubmitting(prev => ({ ...prev, [policyId]: false }));
+    }
+  };
+
+  const handleDeleteComment = async (policyId: string, commentId: string) => {
+    if (!user) return;
+
+    setDeletingComment(commentId);
+    try {
+      await deleteComment(policyId, commentId);
+      
+      // Update local state to remove the deleted comment
+      setComments(prev => ({
+        ...prev,
+        [policyId]: prev[policyId]?.filter(comment => comment.id !== commentId) || []
+      }));
+      
+      setShowDeleteConfirm(null);
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert('Failed to delete comment. Please try again.');
+    } finally {
+      setDeletingComment(null);
     }
   };
 
@@ -187,7 +211,7 @@ const PoliciesFeed = () => {
                       <h2 className="text-2xl font-bold text-gray-800 mb-3 flex-1">{policy.title}</h2>
                       <button
                         onClick={() => togglePolicyExpansion(policy.id)}
-                        className="ml-4 p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                        className="ml-2 p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
                       >
                         {expandedPolicies[policy.id] ? 
                           <ChevronUp className="h-5 w-5 text-gray-600" /> : 
@@ -349,13 +373,47 @@ const PoliciesFeed = () => {
                         <div key={comment.id} className="bg-gradient-to-r from-gray-50 to-blue-50/30 rounded-lg p-4 border border-gray-200/50">
                           <div className="flex flex-col lg:flex-row lg:space-x-4 space-y-3 lg:space-y-0">
                             <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <div className="w-6 h-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
-                                  <span className="text-white text-xs font-semibold">
-                                    {(comment.userName || 'U').charAt(0).toUpperCase()}
-                                  </span>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-6 h-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
+                                    <span className="text-white text-xs font-semibold">
+                                      {(comment.userName || 'U').charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <span className="text-sm font-medium text-gray-700">{comment.userName || 'Anonymous'}</span>
+                                  
+                                  {/* Delete button - only show for comment owner */}
+                                  {user && comment.userId === user.uid && (
+                                    <div className="flex items-center space-x-2">
+                                      {showDeleteConfirm === comment.id ? (
+                                        <div className="flex items-center space-x-2">
+                                          <span className="text-xs text-red-600 font-medium">Delete this comment?</span>
+                                          <button
+                                            onClick={() => handleDeleteComment(policy.id, comment.id)}
+                                            disabled={deletingComment === comment.id}
+                                            className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors duration-200 disabled:opacity-50"
+                                          >
+                                            {deletingComment === comment.id ? 'Deleting...' : 'Yes'}
+                                          </button>
+                                          <button
+                                            onClick={() => setShowDeleteConfirm(null)}
+                                            className="px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400 transition-colors duration-200"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => setShowDeleteConfirm(comment.id)}
+                                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all duration-200"
+                                          title="Delete your comment"
+                                        >
+                                          <Trash2 size={14} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
-                                <span className="text-sm font-medium text-gray-700">{comment.userName || 'Anonymous'}</span>
                               </div>
                               <p className="text-gray-800 leading-relaxed mb-3 text-sm">{comment.text}</p>
                               

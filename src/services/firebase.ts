@@ -7,6 +7,7 @@ import {
   getDocs, 
   doc,
   updateDoc,
+  deleteDoc,
   orderBy, 
   query,
   serverTimestamp,
@@ -271,4 +272,31 @@ export const getAllComments = async () => {
   }
 };
 
+// Delete comment function
+export const deleteComment = async (policyId: string, commentId: string) => {
+  try {
+    const user = getCurrentUser();
+    if (!user) {
+      throw new Error('User must be logged in to delete comments.');
+    }
+
+    if (isFirebaseConfigured()) {
+      await deleteDoc(doc(db, 'policies', policyId, 'comments', commentId));
+      
+      // Update policy analysis after deletion
+      await updatePolicyAnalysis(policyId);
+      
+      return true;
+    } else {
+      // Use mock data
+      if (mockComments[policyId]) {
+        mockComments[policyId] = mockComments[policyId].filter(comment => comment.id !== commentId);
+      }
+      return true;
+    }
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    throw error;
+  }
+};
 export default firebaseConfig;

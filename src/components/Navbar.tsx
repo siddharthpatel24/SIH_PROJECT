@@ -70,7 +70,7 @@ const Navbar: React.FC = () => {
               }`}
             >
               <Home size={18} />
-              <span className="font-medium">{t('nav.home')}</span>
+              <span className="font-medium">{t('Home')}</span>
             </Link>
             
             <Link
@@ -82,7 +82,7 @@ const Navbar: React.FC = () => {
               }`}
             >
               <Plus size={18} />
-              <span className="font-medium">{t('nav.addPolicy')}</span>
+              <span className="font-medium">{t('AddPolicy')}</span>
             </Link>
             
             <Link
@@ -94,7 +94,7 @@ const Navbar: React.FC = () => {
               }`}
             >
               <BarChart3 size={18} />
-              <span className="font-medium">{t('nav.policies')}</span>
+              <span className="font-medium">{t('policies')}</span>
             </Link>
             
             <Link
@@ -106,7 +106,7 @@ const Navbar: React.FC = () => {
               }`}
             >
               <BarChart3 size={18} />
-              <span className="font-medium">{t('nav.dashboard')}</span>
+              <span className="font-medium">{t('Dashboard')}</span>
             </Link>
           </div>
 
@@ -127,7 +127,7 @@ const Navbar: React.FC = () => {
                   className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
                 >
                   <LogOut size={16} />
-                  <span>{t('auth.logout')}</span>
+                  <span>{t('logout')}</span>
                 </button>
               </div>
             ) : (

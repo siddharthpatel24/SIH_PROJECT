@@ -5,7 +5,8 @@ import { Link } from 'react-router-dom';
 import { auth } from '../services/firebase';
 import { FileText, MessageSquare, Send, Calendar, RefreshCw, ChevronDown, ChevronUp, Users, TrendingUp, Trash2, AlertTriangle } from 'lucide-react';
 import { getPolicies, addComment, getComments, deleteComment } from '../services/firebase';
-import { analyzeSentiment, generateSummary } from '../services/api';
+import { analyzeSentiment, summarizeFeedback } from '../services/api';
+//import { translatePolicy } from '../services/translation';
 
 interface Policy {
   id: string;
@@ -24,9 +25,10 @@ interface Comment {
 }
 
 const PoliciesFeed = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [user] = useAuthState(auth);
   const [policies, setPolicies] = useState<Policy[]>([]);
+  const [translatedPolicies, setTranslatedPolicies] = useState<Policy[]>([]);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [newComments, setNewComments] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -35,11 +37,30 @@ const PoliciesFeed = () => {
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
   const [deletingComment, setDeletingComment] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [summaries, setSummaries] = useState<Record<string, string>>({});
+  const [summarizing, setSummarizing] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchPoliciesAndComments();
   }, []);
 
+  useEffect(() => {
+    translatePoliciesContent();
+  }, [policies, i18n.language]);
+
+  const translatePoliciesContent = async () => {
+    if (policies.length === 0) return;
+    
+    try {
+      const translated = await Promise.all(
+        policies.map(policy => translatePolicy(policy, i18n.language))
+      );
+      setTranslatedPolicies(translated);
+    } catch (error) {
+      console.error('Error translating policies:', error);
+      setTranslatedPolicies(policies); // Fallback to original
+    }
+  };
   const fetchPoliciesAndComments = async () => {
     try {
       setLoading(true);
@@ -74,7 +95,9 @@ const PoliciesFeed = () => {
     try {
       // Analyze sentiment
       const { sentiment, confidence } = await analyzeSentiment(commentText);
-      const summary = await generateSummary(commentText);
+      const summary = commentText.length > 100 ? 
+        `User ${sentiment.toLowerCase() === 'positive' ? 'supports' : sentiment.toLowerCase() === 'negative' ? 'opposes' : 'discusses'} the policy with detailed feedback.` :
+        commentText.substring(0, 50) + '...';
 
       // Add comment to Firebase
       const newComment = await addComment(policyId, {
@@ -124,6 +147,27 @@ const PoliciesFeed = () => {
     }
   };
 
+  const handleSummarizeFeedback = async (policyId: string) => {
+    const policyComments = comments[policyId] || [];
+    if (policyComments.length === 0) {
+      alert('No feedback available to summarize');
+      return;
+    }
+
+    setSummarizing(prev => ({ ...prev, [policyId]: true }));
+
+    try {
+      const feedbackTexts = policyComments.map(comment => comment.text);
+      const summary = await summarizeFeedback(feedbackTexts);
+      setSummaries(prev => ({ ...prev, [policyId]: summary }));
+    } catch (error) {
+      console.error('Error summarizing feedback:', error);
+      alert('Failed to generate summary. Please try again.');
+    } finally {
+      setSummarizing(prev => ({ ...prev, [policyId]: false }));
+    }
+  };
+
   const togglePolicyExpansion = (policyId: string) => {
     setExpandedPolicies(prev => ({
       ...prev,
@@ -141,22 +185,22 @@ const PoliciesFeed = () => {
   const getSentimentColor = (sentiment: string) => {
     switch (sentiment.toLowerCase()) {
       case 'positive':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-50 text-green-700 border-green-200';
       case 'negative':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-50 text-red-700 border-red-200';
       default:
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-yellow-50 text-yellow-700 border-yellow-200';
     }
   };
 
   const getSentimentIcon = (sentiment: string) => {
     switch (sentiment.toLowerCase()) {
       case 'positive':
-        return '😊';
+        return '✅';
       case 'negative':
-        return '😞';
+        return '❌';
       default:
-        return '😐';
+        return '⚠️';
     }
   };
 
@@ -190,7 +234,7 @@ const PoliciesFeed = () => {
       </div>
 
       {/* Policies Feed */}
-      {policies.length === 0 ? (
+      {translatedPolicies.length === 0 ? (
         <div className="text-center py-16">
           <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-600 mb-2">No Policies Yet</h3>
@@ -198,7 +242,7 @@ const PoliciesFeed = () => {
         </div>
       ) : (
         <div className="space-y-8">
-          {policies.map((policy) => (
+          {translatedPolicies.map((policy, index) => (
             <div key={policy.id} className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden hover:shadow-2xl transition-all duration-300">
               {/* Policy Header */}
               <div className="p-6 border-b border-gray-200/50">
@@ -230,13 +274,13 @@ const PoliciesFeed = () => {
                         <Calendar className="h-4 w-4" />
                         <span>{new Date(policy.createdAt).toLocaleDateString()}</span>
                       </div>
-                      {policy.sentimentDistribution && (
+                      {policies[index]?.sentimentDistribution && (
                         <div className="flex items-center space-x-2 text-sm text-gray-600">
                           <TrendingUp className="h-4 w-4" />
                           <span>
-                            {policy.sentimentDistribution.positive > policy.sentimentDistribution.negative ? 
+                            {policies[index].sentimentDistribution.positive > policies[index].sentimentDistribution.negative ? 
                               'Mostly Positive' : 
-                              policy.sentimentDistribution.negative > policy.sentimentDistribution.positive ? 
+                              policies[index].sentimentDistribution.negative > policies[index].sentimentDistribution.positive ? 
                               'Mostly Negative' : 'Mixed Response'
                             }
                           </span>
@@ -261,9 +305,9 @@ const PoliciesFeed = () => {
                     )}
                     
                     <div className="flex items-center space-x-2 text-sm text-gray-500">
-                      {policy.createdBy && (
+                      {policies[index]?.createdBy && (
                         <>
-                          <span>Published by {policy.createdBy}</span>
+                          <span>Published by {policies[index].createdBy}</span>
                         </>
                       )}
                     </div>
@@ -271,30 +315,30 @@ const PoliciesFeed = () => {
                 </div>
                 
                 {/* AI Summary Section */}
-                {policy.aiSummary && (
+                {policies[index]?.aiSummary && (
                   <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
                     <h3 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
                       <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-2 rounded-lg mr-3">
                         <TrendingUp className="h-4 w-4 text-white" />
                       </div>
-                      Public Opinion Analysis ({policy.totalComments || 0} responses)
+                      Public Opinion Analysis ({policies[index]?.totalComments || 0} responses)
                     </h3>
-                    <p className="text-gray-700 leading-relaxed mb-3 text-sm">{policy.aiSummary}</p>
+                    <p className="text-gray-700 leading-relaxed mb-3 text-sm">{policies[index]?.aiSummary}</p>
                     
                     {/* Sentiment Distribution */}
-                    {policy.sentimentDistribution && (
+                    {policies[index]?.sentimentDistribution && (
                       <div className="flex items-center space-x-4 text-xs">
                         <div className="flex items-center space-x-2">
                           <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                          <span>Positive: {policy.sentimentDistribution.positive}</span>
+                          <span>Positive: {policies[index].sentimentDistribution.positive}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                          <span>Negative: {policy.sentimentDistribution.negative}</span>
+                          <span>Negative: {policies[index].sentimentDistribution.negative}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                          <span>Neutral: {policy.sentimentDistribution.neutral}</span>
+                          <span>Neutral: {policies[index].sentimentDistribution.neutral}</span>
                         </div>
                       </div>
                     )}
@@ -310,17 +354,54 @@ const PoliciesFeed = () => {
                     <MessageSquare className="h-5 w-5 mr-2" />
                     {t('publicFeedback')} ({comments[policy.id]?.length || 0})
                   </h3>
-                  <button
-                    onClick={() => toggleCommentsView(policy.id)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-sm font-medium"
-                  >
-                    <span>{showComments[policy.id] ? t('hideComments') : t('viewComments')}</span>
-                    {showComments[policy.id] ? 
-                      <ChevronUp className="h-4 w-4" /> : 
-                      <ChevronDown className="h-4 w-4" />
-                    }
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    {comments[policy.id]?.length > 0 && (
+                      <button
+                        onClick={() => handleSummarizeFeedback(policy.id)}
+                        disabled={summarizing[policy.id]}
+                        className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-semibold rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {summarizing[policy.id] ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            <span>Summarizing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <TrendingUp className="h-4 w-4" />
+                            <span>Summarize All Feedback</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => toggleCommentsView(policy.id)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-sm font-medium"
+                    >
+                      <span>{showComments[policy.id] ? t('hideComments') : t('viewComments')}</span>
+                      {showComments[policy.id] ? 
+                        <ChevronUp className="h-4 w-4" /> : 
+                        <ChevronDown className="h-4 w-4" />
+                      }
+                    </button>
+                  </div>
                 </div>
+
+                {/* AI Summary Card */}
+                {summaries[policy.id] && (
+                  <div className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
+                    <div className="flex items-center mb-3">
+                      <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-2 rounded-lg mr-3">
+                        <TrendingUp className="h-5 w-5 text-white" />
+                      </div>
+                      <h4 className="text-lg font-semibold text-gray-800">AI Summary</h4>
+                      <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                        Generated by AI
+                      </span>
+                    </div>
+                    <p className="text-gray-700 leading-relaxed">{summaries[policy.id]}</p>
+                  </div>
+                )}
 
                 {/* Comment Input */}
                 {user ? (
@@ -362,7 +443,7 @@ const PoliciesFeed = () => {
 
                 {/* Comments List */}
                 {showComments[policy.id] && (
-                  <div className="space-y-4 max-h-96 overflow-y-auto border-t border-gray-200 pt-4">
+                  <div className="space-y-3 max-h-96 overflow-y-auto border-t border-gray-200 pt-4">
                     {comments[policy.id]?.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -370,24 +451,36 @@ const PoliciesFeed = () => {
                       </div>
                     ) : (
                       comments[policy.id]?.map((comment) => (
-                        <div key={comment.id} className="bg-gradient-to-r from-gray-50 to-blue-50/30 rounded-lg p-4 border border-gray-200/50">
-                          <div className="flex flex-col lg:flex-row lg:space-x-4 space-y-3 lg:space-y-0">
-                            <div className="flex-1">
+                        <div key={comment.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200">
+                          <div className="flex items-start space-x-3">
+                            {/* User Avatar */}
+                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-white text-sm font-semibold">
+                                {(comment.userName || 'U').charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            
+                            {/* Comment Content */}
+                            <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center space-x-2">
-                                  <div className="w-6 h-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-xs font-semibold">
-                                      {(comment.userName || 'U').charAt(0).toUpperCase()}
-                                    </span>
-                                  </div>
-                                  <span className="text-sm font-medium text-gray-700">{comment.userName || 'Anonymous'}</span>
+                                  <span className="text-sm font-semibold text-gray-900">{comment.userName || 'Anonymous'}</span>
+                                  <span className="text-xs text-gray-500">•</span>
+                                  <span className="text-xs text-gray-500">{new Date(comment.timestamp).toLocaleDateString()}</span>
+                                </div>
+                                
+                                {/* Sentiment Tag */}
+                                <div className="flex items-center space-x-2">
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getSentimentColor(comment.sentiment)}`}>
+                                    <span className="mr-1">{getSentimentIcon(comment.sentiment)}</span>
+                                    {t(comment.sentiment.toLowerCase())}
+                                  </span>
                                   
                                   {/* Delete button - only show for comment owner */}
                                   {user && comment.userId === user.uid && (
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex items-center">
                                       {showDeleteConfirm === comment.id ? (
-                                        <div className="flex items-center space-x-2">
-                                          <span className="text-xs text-red-600 font-medium">Delete this comment?</span>
+                                        <div className="flex items-center space-x-1">
                                           <button
                                             onClick={() => handleDeleteComment(policy.id, comment.id)}
                                             disabled={deletingComment === comment.id}
@@ -408,34 +501,28 @@ const PoliciesFeed = () => {
                                           className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all duration-200"
                                           title="Delete your comment"
                                         >
-                                          <Trash2 size={14} />
+                                          <Trash2 size={12} />
                                         </button>
                                       )}
                                     </div>
                                   )}
                                 </div>
                               </div>
-                              <p className="text-gray-800 leading-relaxed mb-3 text-sm">{comment.text}</p>
                               
-                              <div className="flex items-center space-x-2 text-xs text-gray-500">
-                                <Calendar className="h-3 w-3" />
-                                <span>{new Date(comment.timestamp).toLocaleString()}</span>
-                              </div>
-                            </div>
-
-                            {/* Sentiment Analysis */}
-                            <div className="lg:w-32 text-center space-y-2">
-                              <div className="text-2xl">{getSentimentIcon(comment.sentiment)}</div>
-                              <span className={`inline-block px-2 py-1 rounded border font-semibold text-xs ${getSentimentColor(comment.sentiment)}`}>
-                                {t(comment.sentiment.toLowerCase())}
-                              </span>
-                              <div>
-                                <div className="text-xs font-semibold text-gray-700 mb-1">{t('confidence')}: {comment.confidence}%</div>
-                                <div className="bg-gray-200 rounded-full h-1">
-                                  <div 
-                                    className="bg-gradient-to-r from-blue-500 to-indigo-500 h-1 rounded-full transition-all duration-500"
-                                    style={{ width: `${comment.confidence}%` }}
-                                  ></div>
+                              {/* Comment Text */}
+                              <p className="text-gray-800 text-sm leading-relaxed mb-2">{comment.text}</p>
+                              
+                              {/* Confidence Score */}
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs text-gray-500">AI Confidence:</span>
+                                <div className="flex items-center space-x-1">
+                                  <div className="bg-gray-200 rounded-full h-1.5 w-16">
+                                    <div 
+                                      className="bg-gradient-to-r from-blue-500 to-indigo-500 h-1.5 rounded-full transition-all duration-500"
+                                      style={{ width: `${comment.confidence}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-xs font-medium text-gray-600">{comment.confidence}%</span>
                                 </div>
                               </div>
                             </div>

@@ -150,7 +150,7 @@ const PoliciesFeed = () => {
   const handleSummarizeFeedback = async (policyId: string) => {
     const policyComments = comments[policyId] || [];
     if (policyComments.length === 0) {
-      alert('No feedback available to summarize');
+      alert('No feedback available to summarize. Add some comments first!');
       return;
     }
 
@@ -162,7 +162,11 @@ const PoliciesFeed = () => {
       setSummaries(prev => ({ ...prev, [policyId]: summary }));
     } catch (error) {
       console.error('Error summarizing feedback:', error);
-      alert('Failed to generate summary. Please try again.');
+      // Show a more user-friendly error message
+      setSummaries(prev => ({ 
+        ...prev, 
+        [policyId]: 'Unable to generate summary at this time. Please check your API configuration or try again later.' 
+      }));
     } finally {
       setSummarizing(prev => ({ ...prev, [policyId]: false }));
     }

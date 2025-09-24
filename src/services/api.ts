@@ -286,6 +286,8 @@
 
 // Real AI Integration with Hugging Face and OpenAI
 
+// Real AI Integration with Hugging Face and OpenAI
+
 const HF_API_KEY = import.meta.env.VITE_HF_API_KEY;
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -293,22 +295,22 @@ const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 const analyzeWithHuggingFace = async (text: string) => {
   if (!HF_API_KEY) {
     console.warn('Hugging Face API key not configured, using mock analysis');
-    // Simple mock sentiment analysis based on keywords
-    const positiveWords = ['good', 'great', 'excellent', 'support', 'agree', 'positive', 'beneficial', 'helpful'];
-    const negativeWords = ['bad', 'terrible', 'disagree', 'oppose', 'negative', 'harmful', 'wrong', 'against'];
+    // Enhanced mock sentiment analysis based on keywords
+    const positiveWords = ['good', 'great', 'excellent', 'support', 'agree', 'positive', 'beneficial', 'helpful', 'amazing', 'wonderful', 'fantastic', 'love', 'like', 'approve', 'favor', 'appreciate'];
+    const negativeWords = ['bad', 'terrible', 'disagree', 'oppose', 'negative', 'harmful', 'wrong', 'against', 'hate', 'dislike', 'awful', 'horrible', 'reject', 'disapprove', 'concern', 'worried', 'problem', 'issue', 'fail'];
     
     const lowerText = text.toLowerCase();
     const positiveCount = positiveWords.filter(word => lowerText.includes(word)).length;
     const negativeCount = negativeWords.filter(word => lowerText.includes(word)).length;
     
-    let sentiment = 'Neutral';
+    let sentiment = 'neutral';
     let confidence = 65;
     
-    if (positiveCount > negativeCount) {
-      sentiment = 'Positive';
+    if (positiveCount > negativeCount && positiveCount > 0) {
+      sentiment = 'positive';
       confidence = Math.min(85, 60 + positiveCount * 5);
-    } else if (negativeCount > positiveCount) {
-      sentiment = 'Negative';
+    } else if (negativeCount > positiveCount && negativeCount > 0) {
+      sentiment = 'negative';
       confidence = Math.min(85, 60 + negativeCount * 5);
     }
     
@@ -341,7 +343,7 @@ const analyzeWithHuggingFace = async (text: string) => {
       const negative = predictions.find((p: any) => p.label === 'NEGATIVE');
       
       if (positive && negative) {
-        const sentiment = positive.score > negative.score ? 'Positive' : 'Negative';
+        const sentiment = positive.score > negative.score ? 'positive' : 'negative';
         const confidence = Math.round(Math.max(positive.score, negative.score) * 100);
         return { sentiment, confidence };
       }
@@ -351,21 +353,21 @@ const analyzeWithHuggingFace = async (text: string) => {
   } catch (error) {
     console.error('Hugging Face API failed, using mock analysis:', error);
     // Fallback to mock analysis
-    const positiveWords = ['good', 'great', 'excellent', 'support', 'agree', 'positive', 'beneficial', 'helpful'];
-    const negativeWords = ['bad', 'terrible', 'disagree', 'oppose', 'negative', 'harmful', 'wrong', 'against'];
+    const positiveWords = ['good', 'great', 'excellent', 'support', 'agree', 'positive', 'beneficial', 'helpful', 'amazing', 'wonderful', 'fantastic', 'love', 'like', 'approve', 'favor', 'appreciate'];
+    const negativeWords = ['bad', 'terrible', 'disagree', 'oppose', 'negative', 'harmful', 'wrong', 'against', 'hate', 'dislike', 'awful', 'horrible', 'reject', 'disapprove', 'concern', 'worried', 'problem', 'issue', 'fail'];
     
     const lowerText = text.toLowerCase();
     const positiveCount = positiveWords.filter(word => lowerText.includes(word)).length;
     const negativeCount = negativeWords.filter(word => lowerText.includes(word)).length;
     
-    let sentiment = 'Neutral';
+    let sentiment = 'neutral';
     let confidence = 65;
     
-    if (positiveCount > negativeCount) {
-      sentiment = 'Positive';
+    if (positiveCount > negativeCount && positiveCount > 0) {
+      sentiment = 'positive';
       confidence = Math.min(85, 60 + positiveCount * 5);
-    } else if (negativeCount > positiveCount) {
-      sentiment = 'Negative';
+    } else if (negativeCount > positiveCount && negativeCount > 0) {
+      sentiment = 'negative';
       confidence = Math.min(85, 60 + negativeCount * 5);
     }
     
